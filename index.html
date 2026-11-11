@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rocateli na rotina</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Three.js CDN para criação e animação dos objetos 3D -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <!-- Canvas do Fundo 3D -->
+  <canvas id="bg-3d"></canvas>
+
+  <!-- Container Principal -->
+  <div class="app-container">
+    <header class="header">
+      <h1>rocateli na rotina</h1>
+      <p>Gerenciador de tarefas para Escola, Trabalho, Academia e Lazer</p>
+      
+      <!-- Filtros por Categoria -->
+      <div class="category-filters">
+        <button class="filter-btn active" onclick="filterCategory('Todas')">Todas</button>
+        <button class="filter-btn" onclick="filterCategory('Escola')">📚 Escola</button>
+        <button class="filter-btn" onclick="filterCategory('Trabalho')">💼 Trabalho</button>
+        <button class="filter-btn" onclick="filterCategory('Academia')">🏋️ Academia</button>
+        <button class="filter-btn" onclick="filterCategory('Lazer')">🎮 Lazer</button>
+      </div>
+
+      <button class="btn-primary" onclick="openModal()">+ Nova Rotina</button>
+    </header>
+
+    <!-- Grid de Cards de Rotinas -->
+    <main class="routines-grid" id="routinesGrid">
+      <!-- Os cards serão injetados via JavaScript -->
+    </main>
+  </div>
+
+  <!-- Modal Interativo -->
+  <div class="modal-overlay" id="routineModal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeModal()">&times;</span>
+      <h2 id="modalTitle">Detalhes da Rotina</h2>
+      
+      <form id="routineForm" onsubmit="saveRoutine(event)">
+        <input type="hidden" id="routineId">
+        
+        <div class="form-group">
+          <label for="routineName">Título da Rotina</label>
+          <input type="text" id="routineName" required placeholder="Ex: Aula de História / Treino B">
+        </div>
+
+        <div class="form-group">
+          <label for="routineTime">Horário</label>
+          <input type="time" id="routineTime" required>
+        </div>
+
+        <div class="form-group">
+          <label for="routineCategory">Categoria</label>
+          <select id="routineCategory" required>
+            <option value="Escola">📚 Escola</option>
+            <option value="Trabalho">💼 Trabalho</option>
+            <option value="Academia">🏋️ Academia</option>
+            <option value="Lazer">🎮 Lazer</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="routineDesc">Descrição / Observações</label>
+          <textarea id="routineDesc" rows="4" placeholder="Insira detalhes ou anotações extras..."></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT EMBUTIDO -->
+  <script>
+    // --- 1. CENÁRIO 3D (THREE.JS com Degradê Roxo Claro, Lilás e Roxo Escuro) ---
+    const init3D = () => {
+      const canvas = document.getElementById('bg-3d');
+      if (!canvas || typeof THREE === 'undefined') return;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // Textura em degradê de 3 cores
+      const createGradientTexture = () => {
+        const canvasMat = document.createElement('canvas');
+        canvasMat.width = 256;
+        canvasMat.height = 256;
+        const ctx = canvasMat.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 256, 256);
+        
+        gradient.addColorStop(0, '#d8b4fe');   // Roxo claro
+        gradient.addColorStop(0.5, '#a855f7'); // Lilás
+        gradient.addColorStop(1, '#3b0764');   // Roxo escuro
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 256, 256);
+        return new THREE.CanvasTexture(canvasMat);
+      };
+
+      const texture = createGradientTexture();
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        roughness: 0.25,
+        metalness: 0.45
+      });
+
+      // Luzes do ambiente
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xd8b4fe, 1.8);
+      dirLight.position.set(5, 5, 5);
+      scene.add(dirLight);
+
+      const pointLight = new THREE.PointLight(0xa855f7, 2, 50);
+      pointLight.position.set(-5, -5, -2);
+      scene.add(pointLight);
+
+      // Instanciação dos objetos 3D
+      const shapes = [];
+      const geometries = [
+        new THREE.IcosahedronGeometry(1.2, 0),
+        new THREE.TorusGeometry(1, 0.35, 16, 50),
+        new THREE.OctahedronGeometry(1.3, 0),
+        new THREE.TetrahedronGeometry(1.4, 0),
+        new THREE.DodecahedronGeometry(1.1, 0),
+        new THREE.TorusKnotGeometry(0.8, 0.25, 64, 8)
+      ];
+
+      for (let i = 0; i < 20; i++) {
+        const geom = geometries[Math.floor(Math.random() * geometries.length)];
+        const mesh = new THREE.Mesh(geom, material);
+
+        mesh.position.x = (Math.random() - 0.5) * 24;
+        mesh.position.y = (Math.random() - 0.5) * 24;
+        mesh.position.z = (Math.random() - 0.5) * 16 - 2;
+
+        mesh.rotation.x = Math.random() * Math.PI;
+        mesh.rotation.y = Math.random() * Math.PI;
+
+        const speed = {
+          x: (Math.random() - 0.5) * 0.007,
+          y: (Math.random() - 0.5) * 0.007,
+          rotX: (Math.random() - 0.5) * 0.012,
+          rotY: (Math.random() - 0.5) * 0.012
+        };
+
+        shapes.push({ mesh, speed });
+        scene.add(mesh);
+      }
+
+      camera.position.z = 8;
+
+      // Animação contínua
+      const animate = () => {
+        requestAnimationFrame(animate);
+
+        shapes.forEach(item => {
+          item.mesh.rotation.x += item.speed.rotX;
+          item.mesh.rotation.y += item.speed.rotY;
+
+          item.mesh.position.x += item.speed.x;
+          item.mesh.position.y += item.speed.y;
+
+          if (Math.abs(item.mesh.position.x) > 12) item.speed.x *= -1;
+          if (Math.abs(item.mesh.position.y) > 12) item.speed.y *= -1;
+        });
+
+        renderer.render(scene, camera);
+      };
+
+      animate();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    };
+
+    // --- 2. LÓGICA DAS ROTINAS & MODAL ---
+    let currentCategory = 'Todas';
+    let routines = [
+      { id: 1, name: 'Estudo para Prova de Biologia', time: '07:30', category: 'Escola', desc: 'Revisar estrutura celular e transporte de membrana.' },
+      { id: 2, name: 'Reunião do Projeto Rocateli', time: '10:00', category: 'Trabalho', desc: 'Apresentação do alinhamento semanal e entrega dos relatórios.' },
+      { id: 3, name: 'Treino de Peito e Tríceps', time: '17:30', category: 'Academia', desc: 'Supino reto, inclinado, crossofver e tríceps corda.' },
+      { id: 4, name: 'Assistir Série / Jogar', time: '20:30', category: 'Lazer', desc: 'Tempo livre para descanço e entretenimento.' }
+    ];
+
+    const filterCategory = (cat) => {
+      currentCategory = cat;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(cat) || (cat === 'Todas' && btn.innerText === 'Todas'));
+      });
+      renderRoutines();
+    };
+
+    const renderRoutines = () => {
+      const container = document.getElementById('routinesGrid');
+      container.innerHTML = '';
+
+      const filtered = currentCategory === 'Todas' 
+        ? routines 
+        : routines.filter(r => r.category === currentCategory);
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #c084fc;">Nenhuma rotina cadastrada nesta categoria.</p>`;
+        return;
+      }
+
+      filtered.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'card-3d';
+        card.onclick = () => openModal(r.id);
+
+        const categoryIcons = {
+          'Escola': '📚',
+          'Trabalho': '💼',
+          'Academia': '🏋️',
+          'Lazer': '🎮'
+        };
+
+        card.innerHTML = `
+          <div class="card-tag">${categoryIcons[r.category] || '📌'} ${r.category}</div>
+          <h3 class="card-title">${r.name}</h3>
+          <div class="card-time">⏰ ${r.time}</div>
+          <p class="card-desc">${r.desc}</p>
+        `;
+        container.appendChild(card);
+      });
+    };
+
+    const openModal = (id = null) => {
+      const modal = document.getElementById('routineModal');
+      const form = document.getElementById('routineForm');
+      const title = document.getElementById('modalTitle');
+
+      if (id) {
+        const routine = routines.find(r => r.id === id);
+        document.getElementById('routineId').value = routine.id;
+        document.getElementById('routineName').value = routine.name;
+        document.getElementById('routineTime').value = routine.time;
+        document.getElementById('routineCategory').value = routine.category;
+        document.getElementById('routineDesc').value = routine.desc;
+        title.innerText = 'Editar Rotina';
+      } else {
+        form.reset();
+        document.getElementById('routineId').value = '';
+        title.innerText = 'Nova Rotina';
+      }
+
+      modal.classList.add('active');
+    };
+
+    const closeModal = () => {
+      document.getElementById('routineModal').classList.remove('active');
+    };
+
+    const saveRoutine = (event) => {
+      event.preventDefault();
+      const id = document.getElementById('routineId').value;
+      const name = document.getElementById('routineName').value;
+      const time = document.getElementById('routineTime').value;
+      const category = document.getElementById('routineCategory').value;
+      const desc = document.getElementById('routineDesc').value;
+
+      if (id) {
+        routines = routines.map(r => r.id == id ? { id: Number(id), name, time, category, desc } : r);
+      } else {
+        routines.push({ id: Date.now(), name, time, category, desc });
+      }
+
+      closeModal();
+      renderRoutines();
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      init3D();
+      renderRoutines();
+    });
+  </script>
+</body>
+</html>
